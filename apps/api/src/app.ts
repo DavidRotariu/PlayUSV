@@ -8,6 +8,7 @@ import { bookingsRouter } from './bookings/bookings.routes';
 import { facilitiesRouter } from './facilities/facilities.routes';
 import { authenticate } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { maintenanceRouter } from './maintenance/maintenance.routes';
 import { usersRouter } from './users/users.routes';
 
 const spec = YAML.parse(fs.readFileSync(path.resolve(__dirname, '../../../openapi.yaml'), 'utf8'));
@@ -23,6 +24,7 @@ api.use(authenticate);
 api.use('/users', usersRouter);
 api.use('/facilities', facilitiesRouter);
 api.use('/bookings', bookingsRouter);
+api.use(maintenanceRouter);
 app.use('/api', api);
 
 app.use(notFoundHandler);
