@@ -4,6 +4,7 @@ import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yaml';
 import { authRouter } from './auth/auth.routes';
+import { facilitiesRouter } from './facilities/facilities.routes';
 import { authenticate } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { usersRouter } from './users/users.routes';
@@ -19,6 +20,7 @@ api.use('/auth', authRouter);
 // Everything below requires a valid JWT.
 api.use(authenticate);
 api.use('/users', usersRouter);
+api.use('/facilities', facilitiesRouter);
 app.use('/api', api);
 
 app.use(notFoundHandler);
