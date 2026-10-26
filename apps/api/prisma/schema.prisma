@@ -1,0 +1,106 @@
+// Times (openTime, closeTime, startTime, endTime) are minutes since midnight, Europe/Bucharest.
+// closeTime / endTime 1440 = midnight at the end of the day ("00:00" in the API).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum FacilityType {
+  POOL
+  GYM
+  FOOTBALL
+  BASKETBALL
+}
+
+// COMPLETED is never stored: an ACTIVE booking whose end has passed is reported as COMPLETED.
+enum BookingStatus {
+  ACTIVE
+  CANCELLED
+  COMPLETED
+}
+
+enum CancelledBy {
+  USER
+  ADMIN
+  MAINTENANCE
+}
+
+model User {
+  id          String             @id @default(uuid()) @db.Uuid
+  name        String
+  email       String             @unique
+  role        Role
+  blocked     Boolean            @default(false)
+  createdAt   DateTime           @default(now()) @db.Timestamptz
+  bookings    Booking[]
+  maintenance MaintenanceBlock[]
+}
+
+model Facility {
+  id                       String             @id @default(uuid()) @db.Uuid
+  name                     String
+  type                     FacilityType
+  openTime                 Int
+  closeTime                Int
+  capacityPerSlot          Int
+  studentDailyLimitMinutes Int
+  archivedAt               DateTime?          @db.Timestamptz
+  units                    FacilityUnit[]
+  maintenance              MaintenanceBlock[]
+}
+
+model FacilityUnit {
+  id          String             @id @default(uuid()) @db.Uuid
+  facilityId  String             @db.Uuid
+  name        String
+  archivedAt  DateTime?          @db.Timestamptz
+  facility    Facility           @relation(fields: [facilityId], references: [id])
+  bookings    Booking[]
+  maintenance MaintenanceBlock[]
+
+  @@unique([facilityId, name])
+}
+
+model Booking {
+  id          String        @id @default(uuid()) @db.Uuid
+  userId      String        @db.Uuid
+  unitId      String        @db.Uuid
+  date        DateTime      @db.Date
+  startTime   Int
+  endTime     Int
+  status      BookingStatus @default(ACTIVE)
+  cancelledBy CancelledBy?
+  createdAt   DateTime      @default(now()) @db.Timestamptz
+  user        User          @relation(fields: [userId], references: [id])
+  unit        FacilityUnit  @relation(fields: [unitId], references: [id])
+
+  @@index([unitId, date, status])
+  @@index([userId, date, status])
+}
+
+model MaintenanceBlock {
+  id          String        @id @default(uuid()) @db.Uuid
+  facilityId  String        @db.Uuid
+  unitId      String?       @db.Uuid
+  startsAt    DateTime      @db.Timestamptz
+  endsAt      DateTime      @db.Timestamptz
+  reason      String?
+  createdById String        @db.Uuid
+  facility    Facility      @relation(fields: [facilityId], references: [id])
+  unit        FacilityUnit? @relation(fields: [unitId], references: [id])
+  createdBy   User          @relation(fields: [createdById], references: [id])
+
+  @@index([facilityId, startsAt, endsAt])
+}
