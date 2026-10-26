@@ -67,7 +67,12 @@ export async function create(actor: User, input: BookingCreate) {
     const unit = await facilitiesRepo.lockUnit(tx, input.unitId);
     if (!unit) throw notFound('Terenul nu a fost găsit.');
 
-    const userBookings = await bookingsRepo.userActiveOnDate(user.id, unit.facilityId, input.date, tx);
+    const userBookings = await bookingsRepo.userActiveOnDate(
+      user.id,
+      unit.facilityId,
+      input.date,
+      tx,
+    );
     const unitBookings = await bookingsRepo.activeOnDate([unit.id], input.date, tx);
     const blocks = await maintenanceRepo.overlapping(
       unit.facilityId,
@@ -91,7 +96,13 @@ export async function create(actor: User, input: BookingCreate) {
     });
 
     const booking = await bookingsRepo.create(
-      { userId: user.id, unitId: unit.id, date: dbDate(input.date), startTime: start, endTime: end },
+      {
+        userId: user.id,
+        unitId: unit.id,
+        date: dbDate(input.date),
+        startTime: start,
+        endTime: end,
+      },
       tx,
     );
     return toBookingDto(booking);
@@ -101,7 +112,10 @@ export async function create(actor: User, input: BookingCreate) {
 export async function listMine(user: User, scope: 'upcoming' | 'past') {
   const now = nowLocal();
   const where = scope === 'upcoming' ? bookingsRepo.notEnded(now) : bookingsRepo.ended(now);
-  const bookings = await bookingsRepo.list({ userId: user.id, ...where }, scope === 'upcoming' ? 'asc' : 'desc');
+  const bookings = await bookingsRepo.list(
+    { userId: user.id, ...where },
+    scope === 'upcoming' ? 'asc' : 'desc',
+  );
   return bookings.map((b) => toBookingDto(b, now));
 }
 
@@ -132,7 +146,8 @@ async function getOwnedOrAdmin(actor: User, id: string) {
   return booking;
 }
 
-export const get = async (actor: User, id: string) => toBookingDto(await getOwnedOrAdmin(actor, id));
+export const get = async (actor: User, id: string) =>
+  toBookingDto(await getOwnedOrAdmin(actor, id));
 
 /** Users cancel their own bookings until the cutoff before start; admins any booking not yet ended. */
 export async function cancel(actor: User, id: string) {
@@ -144,7 +159,10 @@ export async function cancel(actor: User, id: string) {
   const date = fromDbDate(booking.date);
   if (hasEnded(date, booking.endTime, now)) throw notCancellable('Rezervarea s-a încheiat.');
   const minutesToStart = daysBetween(now.date, date) * 1440 + booking.startTime - now.minutes;
-  if (actor.role !== 'ADMIN' && (minutesToStart <= 0 || minutesToStart < config.cancelCutoffMinutes)) {
+  if (
+    actor.role !== 'ADMIN' &&
+    (minutesToStart <= 0 || minutesToStart < config.cancelCutoffMinutes)
+  ) {
     throw notCancellable('Rezervarea a început sau termenul de anulare a trecut.');
   }
 

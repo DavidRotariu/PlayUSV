@@ -752,7 +752,8 @@ components:
 
     Facility:
       type: object
-      required: [id, name, type, openTime, closeTime, capacityPerSlot, studentDailyLimitMinutes, units]
+      required:
+        [id, name, type, openTime, closeTime, capacityPerSlot, studentDailyLimitMinutes, units]
       properties:
         id:
           type: string
@@ -783,7 +784,8 @@ components:
 
     FacilityInput:
       type: object
-      required: [name, type, openTime, closeTime, capacityPerSlot, studentDailyLimitMinutes, unitNames]
+      required:
+        [name, type, openTime, closeTime, capacityPerSlot, studentDailyLimitMinutes, unitNames]
       properties:
         name:
           type: string
@@ -858,7 +860,20 @@ components:
 
     Booking:
       type: object
-      required: [id, user, facilityId, facilityName, unitId, unitName, date, startTime, endTime, status, createdAt]
+      required:
+        [
+          id,
+          user,
+          facilityId,
+          facilityName,
+          unitId,
+          unitName,
+          date,
+          startTime,
+          endTime,
+          status,
+          createdAt,
+        ]
       properties:
         id:
           type: string

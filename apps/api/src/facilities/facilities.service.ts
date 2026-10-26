@@ -3,7 +3,15 @@ import * as bookingsRepo from '../bookings/bookings.repository';
 import { STUDENT_EARLIEST_START } from '../bookings/bookings.rules';
 import { config } from '../config';
 import { conflict, notFound } from '../lib/errors';
-import { daysBetween, nowLocal, SLOT, toEndMinutes, toHHMM, toInstant, toMinutes } from '../lib/time';
+import {
+  daysBetween,
+  nowLocal,
+  SLOT,
+  toEndMinutes,
+  toHHMM,
+  toInstant,
+  toMinutes,
+} from '../lib/time';
 import * as maintenanceRepo from '../maintenance/maintenance.repository';
 import { toUserSummary } from '../users/users.service';
 import * as facilitiesRepo from './facilities.repository';
@@ -55,7 +63,13 @@ export async function update(id: string, input: FacilityInput) {
   const units = await facilitiesRepo.allUnits(id);
   const byName = new Map(units.map((u) => [u.name, u]));
   const archive = units.filter((u) => !u.archivedAt && !input.unitNames.includes(u.name));
-  if (archive.length && (await bookingsRepo.countUpcomingActive(archive.map((u) => u.id), nowLocal()))) {
+  if (
+    archive.length &&
+    (await bookingsRepo.countUpcomingActive(
+      archive.map((u) => u.id),
+      nowLocal(),
+    ))
+  ) {
     throw conflict(
       'FACILITY_HAS_ACTIVE_BOOKINGS',
       `${archive.map((u) => u.name).join(', ')} are rezervări viitoare active și nu poate fi eliminat.`,
@@ -72,7 +86,12 @@ export async function update(id: string, input: FacilityInput) {
 /** Soft delete: past bookings keep referencing the facility. */
 export async function remove(id: string) {
   const facility = await getOrThrow(id);
-  if (await bookingsRepo.countUpcomingActive(facility.units.map((u) => u.id), nowLocal())) {
+  if (
+    await bookingsRepo.countUpcomingActive(
+      facility.units.map((u) => u.id),
+      nowLocal(),
+    )
+  ) {
     throw conflict(
       'FACILITY_HAS_ACTIVE_BOOKINGS',
       'Baza are rezervări viitoare active și nu poate fi ștearsă.',
@@ -88,7 +107,10 @@ export async function listSlots(user: User, facilityId: string, date: string, un
 
   const now = nowLocal();
   const tooFar = daysBetween(now.date, date) > config.maxDaysAhead;
-  const bookings = await bookingsRepo.activeOnDate(units.map((u) => u.id), date);
+  const bookings = await bookingsRepo.activeOnDate(
+    units.map((u) => u.id),
+    date,
+  );
   const blocks = await maintenanceRepo.overlapping(
     facility.id,
     unitId,
@@ -107,7 +129,9 @@ export async function listSlots(user: User, facilityId: string, date: string, un
       const status =
         date < now.date || (date === now.date && start < now.minutes)
           ? 'PAST'
-          : blocks.some((m) => (!m.unitId || m.unitId === unit.id) && m.startsAt < to && m.endsAt > from)
+          : blocks.some(
+                (m) => (!m.unitId || m.unitId === unit.id) && m.startsAt < to && m.endsAt > from,
+              )
             ? 'MAINTENANCE'
             : bookedBy.length >= facility.capacityPerSlot
               ? 'FULL'

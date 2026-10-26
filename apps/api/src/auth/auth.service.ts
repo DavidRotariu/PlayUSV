@@ -47,7 +47,9 @@ export async function login(rawEmail: string, name: string) {
 export async function loginWithGoogle(idToken: string) {
   let payload;
   try {
-    payload = (await google.verifyIdToken({ idToken, audience: config.googleClientId })).getPayload();
+    payload = (
+      await google.verifyIdToken({ idToken, audience: config.googleClientId })
+    ).getPayload();
   } catch {
     throw unauthorized('Autentificarea Google a eșuat. Încearcă din nou.');
   }

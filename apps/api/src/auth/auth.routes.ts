@@ -16,7 +16,10 @@ authRouter.post('/google', async (req, res) => {
 if (config.isDev) {
   authRouter.post('/dev-login', async (req, res) => {
     const body = z.object({ email: z.email(), name: z.string().min(1).optional() }).parse(req.body);
-    const { token, user } = await authService.login(body.email, body.name ?? body.email.split('@')[0]);
+    const { token, user } = await authService.login(
+      body.email,
+      body.name ?? body.email.split('@')[0],
+    );
     res.json({ token, user: toUserDto(user) });
   });
 }

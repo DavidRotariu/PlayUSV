@@ -5,10 +5,42 @@ import { addDays, dbDate, nowLocal, toMinutes as m } from '../src/lib/time';
 const prisma = new PrismaClient();
 
 const facilities = [
-  { name: 'Bazin de înot', type: 'POOL', open: '08:00', close: 1320, cap: 10, limit: 60, units: ['Bazinul'] },
-  { name: 'Sală de fitness', type: 'GYM', open: '08:00', close: 1440, cap: 50, limit: 120, units: ['Sala'] },
-  { name: 'Teren de fotbal', type: 'FOOTBALL', open: '08:00', close: 1440, cap: 1, limit: 180, units: ['Terenul'] },
-  { name: 'Teren de baschet', type: 'BASKETBALL', open: '08:00', close: 1320, cap: 1, limit: 120, units: ['Terenul 1', 'Terenul 2'] },
+  {
+    name: 'Bazin de înot',
+    type: 'POOL',
+    open: '08:00',
+    close: 1320,
+    cap: 10,
+    limit: 60,
+    units: ['Bazinul'],
+  },
+  {
+    name: 'Sală de fitness',
+    type: 'GYM',
+    open: '08:00',
+    close: 1440,
+    cap: 50,
+    limit: 120,
+    units: ['Sala'],
+  },
+  {
+    name: 'Teren de fotbal',
+    type: 'FOOTBALL',
+    open: '08:00',
+    close: 1440,
+    cap: 1,
+    limit: 180,
+    units: ['Terenul'],
+  },
+  {
+    name: 'Teren de baschet',
+    type: 'BASKETBALL',
+    open: '08:00',
+    close: 1320,
+    cap: 1,
+    limit: 120,
+    units: ['Terenul 1', 'Terenul 2'],
+  },
 ] as const;
 
 async function main() {
@@ -45,7 +77,20 @@ async function main() {
     await user('Prof. Mihai Ionescu', 'mihai.ionescu@usm.ro', 'TEACHER'),
     await user('Conf. Elena Rusu', 'elena.rusu@usm.ro', 'TEACHER'),
   ];
-  const firstNames = ['Ana', 'Andrei', 'Maria', 'Ioan', 'Ioana', 'Vlad', 'Elena', 'Radu', 'Diana', 'Paul', 'Irina', 'Matei'];
+  const firstNames = [
+    'Ana',
+    'Andrei',
+    'Maria',
+    'Ioan',
+    'Ioana',
+    'Vlad',
+    'Elena',
+    'Radu',
+    'Diana',
+    'Paul',
+    'Irina',
+    'Matei',
+  ];
   const students = [];
   for (const [i, first] of firstNames.entries()) {
     students.push(await user(`${first} Popescu`, `student${i + 1}@student.usv.ro`, 'STUDENT'));
@@ -62,7 +107,14 @@ async function main() {
     start: string,
     end: number,
     extra: Partial<Prisma.BookingCreateManyInput> = {},
-  ): Prisma.BookingCreateManyInput => ({ userId, unitId, date, startTime: m(start), endTime: end, ...extra });
+  ): Prisma.BookingCreateManyInput => ({
+    userId,
+    unitId,
+    date,
+    startTime: m(start),
+    endTime: end,
+    ...extra,
+  });
 
   await prisma.booking.createMany({
     data: [

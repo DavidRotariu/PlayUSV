@@ -12,11 +12,17 @@ const details = {
 export type BookingWithDetails = Prisma.BookingGetPayload<{ include: typeof details }>;
 
 export const notEnded = (now: Now): Prisma.BookingWhereInput => ({
-  OR: [{ date: { gt: dbDate(now.date) } }, { date: dbDate(now.date), endTime: { gt: now.minutes } }],
+  OR: [
+    { date: { gt: dbDate(now.date) } },
+    { date: dbDate(now.date), endTime: { gt: now.minutes } },
+  ],
 });
 
 export const ended = (now: Now): Prisma.BookingWhereInput => ({
-  OR: [{ date: { lt: dbDate(now.date) } }, { date: dbDate(now.date), endTime: { lte: now.minutes } }],
+  OR: [
+    { date: { lt: dbDate(now.date) } },
+    { date: dbDate(now.date), endTime: { lte: now.minutes } },
+  ],
 });
 
 /** Maps the API status to a query; COMPLETED is ACTIVE + ended. */
@@ -25,7 +31,8 @@ export const statusWhere = (status: BookingStatus, now: Now): Prisma.BookingWher
     ? { status }
     : { status: 'ACTIVE', ...(status === 'ACTIVE' ? notEnded(now) : ended(now)) };
 
-export const findById = (id: string) => prisma.booking.findUnique({ where: { id }, include: details });
+export const findById = (id: string) =>
+  prisma.booking.findUnique({ where: { id }, include: details });
 
 export const list = (where: Prisma.BookingWhereInput, order: Prisma.SortOrder = 'asc') =>
   prisma.booking.findMany({
@@ -42,7 +49,12 @@ export const activeOnDate = (unitIds: string[], date: string, db: Tx = prisma) =
     orderBy: { createdAt: 'asc' },
   });
 
-export const userActiveOnDate = (userId: string, facilityId: string, date: string, db: Tx = prisma) =>
+export const userActiveOnDate = (
+  userId: string,
+  facilityId: string,
+  date: string,
+  db: Tx = prisma,
+) =>
   db.booking.findMany({
     where: { userId, date: dbDate(date), status: 'ACTIVE', unit: { facilityId } },
   });

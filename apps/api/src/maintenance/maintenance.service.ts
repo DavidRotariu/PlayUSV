@@ -60,12 +60,21 @@ export async function preview(facilityId: string, r: MaintenanceRange) {
  * Locks every unit of the facility so no booking can commit inside the block while it is
  * being created, then cancels the affected bookings in the same transaction.
  */
-export async function create(actor: User, facilityId: string, r: MaintenanceRange & { reason?: string }) {
+export async function create(
+  actor: User,
+  facilityId: string,
+  r: MaintenanceRange & { reason?: string },
+) {
   await facilityAndUnit(facilityId, r.unitId);
   return transaction(async (tx) => {
     const unitIds = await facilitiesRepo.lockUnitsOfFacility(tx, facilityId);
-    if ((await maintenanceRepo.overlapping(facilityId, r.unitId, r.startsAt, r.endsAt, tx)).length) {
-      throw conflict('MAINTENANCE_OVERLAP', 'Perioada se suprapune cu o altă perioadă de mentenanță.');
+    if (
+      (await maintenanceRepo.overlapping(facilityId, r.unitId, r.startsAt, r.endsAt, tx)).length
+    ) {
+      throw conflict(
+        'MAINTENANCE_OVERLAP',
+        'Perioada se suprapune cu o altă perioadă de mentenanță.',
+      );
     }
     const block = await maintenanceRepo.create(
       {

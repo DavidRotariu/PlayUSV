@@ -8,7 +8,10 @@ type Range = { startTime: number; endTime: number };
 
 export type BookingCheck = {
   role: Role;
-  facility: Pick<Facility, 'name' | 'openTime' | 'closeTime' | 'capacityPerSlot' | 'studentDailyLimitMinutes'>;
+  facility: Pick<
+    Facility,
+    'name' | 'openTime' | 'closeTime' | 'capacityPerSlot' | 'studentDailyLimitMinutes'
+  >;
   date: string;
   start: number;
   end: number;

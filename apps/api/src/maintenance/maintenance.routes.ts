@@ -23,9 +23,13 @@ maintenanceRouter.post('/facilities/:facilityId/maintenance', requireAdmin, asyn
   res.status(201).json(await maintenanceService.create(req.user, facilityId(req.params), body));
 });
 
-maintenanceRouter.get('/facilities/:facilityId/maintenance/preview', requireAdmin, async (req, res) => {
-  res.json(await maintenanceService.preview(facilityId(req.params), range.parse(req.query)));
-});
+maintenanceRouter.get(
+  '/facilities/:facilityId/maintenance/preview',
+  requireAdmin,
+  async (req, res) => {
+    res.json(await maintenanceService.preview(facilityId(req.params), range.parse(req.query)));
+  },
+);
 
 maintenanceRouter.delete('/maintenance/:blockId', requireAdmin, async (req, res) => {
   const { blockId } = z.object({ blockId: s.uuid }).parse(req.params);

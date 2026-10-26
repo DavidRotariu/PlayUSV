@@ -9,7 +9,11 @@ export type FacilityWithUnits = Prisma.FacilityGetPayload<{ include: typeof with
 export type FacilityData = Omit<Prisma.FacilityCreateInput, 'units' | 'maintenance' | 'archivedAt'>;
 
 export const list = () =>
-  prisma.facility.findMany({ where: { archivedAt: null }, include: withUnits, orderBy: { name: 'asc' } });
+  prisma.facility.findMany({
+    where: { archivedAt: null },
+    include: withUnits,
+    orderBy: { name: 'asc' },
+  });
 
 export const findById = (id: string) =>
   prisma.facility.findFirst({ where: { id, archivedAt: null }, include: withUnits });
@@ -21,7 +25,8 @@ export const create = (data: FacilityData, unitNames: string[]) =>
   });
 
 /** All units ever created for the facility, archived ones included. */
-export const allUnits = (facilityId: string) => prisma.facilityUnit.findMany({ where: { facilityId } });
+export const allUnits = (facilityId: string) =>
+  prisma.facilityUnit.findMany({ where: { facilityId } });
 
 export const update = (
   id: string,
@@ -29,9 +34,17 @@ export const update = (
   units: { create: string[]; restore: string[]; archive: string[] },
 ) =>
   prisma.$transaction(async (tx) => {
-    await tx.facilityUnit.createMany({ data: units.create.map((name) => ({ facilityId: id, name })) });
-    await tx.facilityUnit.updateMany({ where: { id: { in: units.restore } }, data: { archivedAt: null } });
-    await tx.facilityUnit.updateMany({ where: { id: { in: units.archive } }, data: { archivedAt: new Date() } });
+    await tx.facilityUnit.createMany({
+      data: units.create.map((name) => ({ facilityId: id, name })),
+    });
+    await tx.facilityUnit.updateMany({
+      where: { id: { in: units.restore } },
+      data: { archivedAt: null },
+    });
+    await tx.facilityUnit.updateMany({
+      where: { id: { in: units.archive } },
+      data: { archivedAt: new Date() },
+    });
     return tx.facility.update({ where: { id }, data, include: withUnits });
   });
 
@@ -46,7 +59,9 @@ export async function lockUnit(
   const [unit] = await tx.$queryRaw<FacilityUnit[]>`
     SELECT * FROM "FacilityUnit" WHERE id = ${unitId}::uuid AND "archivedAt" IS NULL FOR UPDATE`;
   if (!unit) return null;
-  const facility = await tx.facility.findFirst({ where: { id: unit.facilityId, archivedAt: null } });
+  const facility = await tx.facility.findFirst({
+    where: { id: unit.facilityId, archivedAt: null },
+  });
   return facility && { ...unit, facility };
 }
 

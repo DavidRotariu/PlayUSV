@@ -21,7 +21,9 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     return;
   }
   if (err?.type === 'entity.parse.failed') {
-    res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Corpul cererii nu este JSON valid.' });
+    res
+      .status(400)
+      .json({ code: 'VALIDATION_ERROR', message: 'Corpul cererii nu este JSON valid.' });
     return;
   }
   console.error(err);
