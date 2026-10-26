@@ -20,6 +20,9 @@ info:
     - studenții nu depășesc limita zilnică a bazei (cadrele didactice și administratorii nu au limită);
     - baza (sau terenul) nu este în mentenanță;
     - contul utilizatorului nu este blocat.
+
+    **Cont blocat:** orice endpoint autentificat răspunde cu 403 `ACCOUNT_BLOCKED` dacă
+    administratorul a blocat contul.
 servers:
   - url: http://localhost:3000/api
     description: Server local de dezvoltare
@@ -97,6 +100,8 @@ paths:
                 $ref: '#/components/schemas/User'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AccountBlocked'
 
   /users:
     get:
@@ -174,6 +179,8 @@ paths:
                   $ref: '#/components/schemas/Facility'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AccountBlocked'
     post:
       tags: [Facilities]
       summary: Adaugă o bază sportivă (administrator)
@@ -214,6 +221,8 @@ paths:
                 $ref: '#/components/schemas/Facility'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AccountBlocked'
         '404':
           $ref: '#/components/responses/NotFound'
     put:
@@ -244,6 +253,15 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: O unitate eliminată din `unitNames` are rezervări viitoare active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: FACILITY_HAS_ACTIVE_BOOKINGS
+                message: Terenul 2 are rezervări viitoare active și nu poate fi eliminat.
     delete:
       tags: [Facilities]
       summary: Șterge o bază sportivă (administrator)
@@ -265,6 +283,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+              example:
+                code: FACILITY_HAS_ACTIVE_BOOKINGS
+                message: Baza are rezervări viitoare active și nu poate fi ștearsă.
 
   /facilities/{facilityId}/slots:
     get:
@@ -302,6 +323,8 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AccountBlocked'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -369,7 +392,29 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: '#/components/responses/Forbidden'
+          description: '`userId` trimis de cineva care nu este administrator, sau cont blocat'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                faraDrept:
+                  value:
+                    code: FORBIDDEN
+                    message: Doar administratorii pot rezerva în numele altui utilizator.
+                contBlocat:
+                  value:
+                    code: ACCOUNT_BLOCKED
+                    message: Contul tău a fost blocat de administrator.
+        '404':
+          description: Unitatea sau utilizatorul (`userId`) nu există
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: NOT_FOUND
+                message: Terenul nu a fost găsit.
         '409':
           description: Rezervarea încalcă o regulă
           content:
@@ -397,6 +442,18 @@ paths:
                   value:
                     code: OUTSIDE_OPENING_HOURS
                     message: Intervalul ales este în afara programului bazei.
+                inTrecut:
+                  value:
+                    code: BOOKING_IN_PAST
+                    message: Intervalul ales a trecut deja.
+                preaDeparte:
+                  value:
+                    code: BOOKING_TOO_FAR_AHEAD
+                    message: Poți rezerva cu cel mult 14 zile în avans.
+                dejaRezervat:
+                  value:
+                    code: ALREADY_BOOKED
+                    message: Ai deja o rezervare la această bază în intervalul ales.
 
   /bookings/me:
     get:
@@ -422,6 +479,8 @@ paths:
                   $ref: '#/components/schemas/Booking'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AccountBlocked'
 
   /bookings/{bookingId}:
     get:
@@ -474,6 +533,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+              example:
+                code: BOOKING_NOT_CANCELLABLE
+                message: Rezervarea a început sau termenul de anulare a trecut.
 
   /facilities/{facilityId}/maintenance:
     get:
@@ -493,6 +555,8 @@ paths:
                   $ref: '#/components/schemas/MaintenanceBlock'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AccountBlocked'
         '404':
           $ref: '#/components/responses/NotFound'
     post:
@@ -529,6 +593,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+              example:
+                code: MAINTENANCE_OVERLAP
+                message: Perioada se suprapune cu o altă perioadă de mentenanță.
 
   /facilities/{facilityId}/maintenance/preview:
     get:
@@ -570,6 +637,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /maintenance/{blockId}:
     delete:
@@ -643,6 +712,15 @@ components:
           example:
             code: FORBIDDEN
             message: Doar administratorii pot face această operație.
+    AccountBlocked:
+      description: Contul utilizatorului este blocat
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: ACCOUNT_BLOCKED
+            message: Contul tău a fost blocat de administrator.
     NotFound:
       description: Resursa nu există
       content:
@@ -752,8 +830,7 @@ components:
 
     Facility:
       type: object
-      required:
-        [id, name, type, openTime, closeTime, capacityPerSlot, studentDailyLimitMinutes, units]
+      required: [id, name, type, openTime, closeTime, capacityPerSlot, studentDailyLimitMinutes, units]
       properties:
         id:
           type: string
@@ -784,8 +861,7 @@ components:
 
     FacilityInput:
       type: object
-      required:
-        [name, type, openTime, closeTime, capacityPerSlot, studentDailyLimitMinutes, unitNames]
+      required: [name, type, openTime, closeTime, capacityPerSlot, studentDailyLimitMinutes, unitNames]
       properties:
         name:
           type: string
@@ -860,20 +936,7 @@ components:
 
     Booking:
       type: object
-      required:
-        [
-          id,
-          user,
-          facilityId,
-          facilityName,
-          unitId,
-          unitName,
-          date,
-          startTime,
-          endTime,
-          status,
-          createdAt,
-        ]
+      required: [id, user, facilityId, facilityName, unitId, unitName, date, startTime, endTime, status, createdAt]
       properties:
         id:
           type: string
