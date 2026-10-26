@@ -4,6 +4,7 @@ import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yaml';
 import { authRouter } from './auth/auth.routes';
+import { bookingsRouter } from './bookings/bookings.routes';
 import { facilitiesRouter } from './facilities/facilities.routes';
 import { authenticate } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
@@ -21,6 +22,7 @@ api.use('/auth', authRouter);
 api.use(authenticate);
 api.use('/users', usersRouter);
 api.use('/facilities', facilitiesRouter);
+api.use('/bookings', bookingsRouter);
 app.use('/api', api);
 
 app.use(notFoundHandler);

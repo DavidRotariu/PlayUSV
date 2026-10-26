@@ -1,5 +1,6 @@
 import type { FacilityType, User } from '@prisma/client';
 import * as bookingsRepo from '../bookings/bookings.repository';
+import { STUDENT_EARLIEST_START } from '../bookings/bookings.rules';
 import { config } from '../config';
 import { conflict, notFound } from '../lib/errors';
 import { daysBetween, nowLocal, SLOT, toEndMinutes, toHHMM, toInstant, toMinutes } from '../lib/time';
@@ -17,8 +18,6 @@ export type FacilityInput = {
   studentDailyLimitMinutes: number;
   unitNames: string[];
 };
-
-export const STUDENT_EARLIEST_START = 18 * 60;
 
 export const toFacilityDto = (f: FacilityWithUnits) => ({
   id: f.id,
