@@ -1,0 +1,26 @@
+{
+  "name": "campus-sports-booking",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w apps/api",
+    "build": "npm run build -w apps/api",
+    "start": "npm run start -w apps/api",
+    "test": "npm run test -w apps/api",
+    "typecheck": "npm run typecheck -w apps/api",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "db:migrate": "npm run db:migrate -w apps/api",
+    "db:seed": "npm run db:seed -w apps/api",
+    "db:studio": "npm run db:studio -w apps/api"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.10",
+    "typescript-eslint": "^8.72.0"
+  }
+}

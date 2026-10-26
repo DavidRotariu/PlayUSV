@@ -1,0 +1,963 @@
+openapi: 3.0.3
+info:
+  title: Campus Sports Booking API
+  version: 1.0.0
+  description: |
+    API REST pentru aplicația Campus Sports Booking (Echipa 5, Ingineria programelor).
+
+    Aplicația permite studenților și cadrelor didactice USV să rezerve intervale de 30 de minute
+    la bazele sportive ale universității (bazin, sală de fitness, teren de fotbal, terenuri de baschet),
+    iar administratorilor să gestioneze bazele, rezervările și perioadele de mentenanță.
+
+    **Autentificare:** utilizatorul se autentifică cu Google (conturi @student.usv.ro sau @usm.ro).
+    Serverul verifică token-ul Google și întoarce un JWT, trimis apoi în antetul
+    `Authorization: Bearer <token>` la toate celelalte cereri.
+
+    **Reguli de rezervare** verificate de server la `POST /bookings`:
+    - intervalul se află în programul bazei și durează un multiplu de 30 de minute;
+    - capacitatea pe interval nu este depășită;
+    - studenții pot rezerva doar intervale care încep de la 18:00;
+    - studenții nu depășesc limita zilnică a bazei (cadrele didactice și administratorii nu au limită);
+    - baza (sau terenul) nu este în mentenanță;
+    - contul utilizatorului nu este blocat.
+servers:
+  - url: http://localhost:3000/api
+    description: Server local de dezvoltare
+tags:
+  - name: Auth
+    description: Autentificare cu Google
+  - name: Users
+    description: Utilizatori și conturi
+  - name: Facilities
+    description: Baze sportive și disponibilitate
+  - name: Bookings
+    description: Rezervări
+  - name: Maintenance
+    description: Blocări pentru mentenanță (administrator)
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/google:
+    post:
+      tags: [Auth]
+      summary: Autentificare cu Google
+      description: |
+        Primește ID token-ul obținut de frontend de la Google, îl verifică și întoarce un JWT al aplicației.
+        Sunt acceptate doar conturile @student.usv.ro (rol STUDENT) și @usm.ro (rol TEACHER).
+        La prima autentificare, contul este creat automat.
+      operationId: loginWithGoogle
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoogleLoginRequest'
+      responses:
+        '200':
+          description: Autentificare reușită
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Token Google invalid sau expirat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Domeniul contului nu este permis sau contul este blocat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                domeniuInvalid:
+                  value:
+                    code: DOMAIN_NOT_ALLOWED
+                    message: Folosește un cont @student.usv.ro sau @usm.ro.
+                contBlocat:
+                  value:
+                    code: ACCOUNT_BLOCKED
+                    message: Contul tău a fost blocat de administrator.
+
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Profilul utilizatorului autentificat
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Profilul utilizatorului
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users:
+    get:
+      tags: [Users]
+      summary: Lista utilizatorilor (administrator)
+      operationId: listUsers
+      parameters:
+        - name: role
+          in: query
+          schema:
+            $ref: '#/components/schemas/Role'
+        - name: blocked
+          in: query
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          description: Caută după nume sau email
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista utilizatorilor
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /users/{userId}/block:
+    patch:
+      tags: [Users]
+      summary: Blochează sau deblochează un cont (administrator)
+      operationId: setUserBlocked
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlockUserRequest'
+      responses:
+        '200':
+          description: Contul a fost actualizat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /facilities:
+    get:
+      tags: [Facilities]
+      summary: Lista bazelor sportive
+      operationId: listFacilities
+      responses:
+        '200':
+          description: Lista bazelor sportive
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Facility'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Facilities]
+      summary: Adaugă o bază sportivă (administrator)
+      operationId: createFacility
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacilityInput'
+      responses:
+        '201':
+          description: Baza a fost creată
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Facility'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /facilities/{facilityId}:
+    get:
+      tags: [Facilities]
+      summary: Detaliile unei baze sportive
+      operationId: getFacility
+      parameters:
+        - $ref: '#/components/parameters/FacilityId'
+      responses:
+        '200':
+          description: Detaliile bazei
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Facility'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Facilities]
+      summary: Actualizează o bază sportivă (administrator)
+      description: Modifică programul, capacitatea sau limita zilnică a unei baze.
+      operationId: updateFacility
+      parameters:
+        - $ref: '#/components/parameters/FacilityId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacilityInput'
+      responses:
+        '200':
+          description: Baza a fost actualizată
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Facility'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Facilities]
+      summary: Șterge o bază sportivă (administrator)
+      operationId: deleteFacility
+      parameters:
+        - $ref: '#/components/parameters/FacilityId'
+      responses:
+        '204':
+          description: Baza a fost ștearsă
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Baza are rezervări viitoare active și nu poate fi ștearsă
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /facilities/{facilityId}/slots:
+    get:
+      tags: [Facilities]
+      summary: Intervalele de 30 de minute ale unei zile
+      description: |
+        Întoarce toate intervalele din programul bazei pentru ziua cerută, cu locurile ocupate,
+        lista persoanelor care au rezervat (doar numele) și starea intervalului pentru utilizatorul curent.
+      operationId: listSlots
+      parameters:
+        - $ref: '#/components/parameters/FacilityId'
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+            example: '2026-10-16'
+        - name: unitId
+          in: query
+          description: Doar pentru bazele cu mai multe unități (ex. terenurile de baschet)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Intervalele zilei
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Slot'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /bookings:
+    get:
+      tags: [Bookings]
+      summary: Toate rezervările (administrator)
+      operationId: listBookings
+      parameters:
+        - name: facilityId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: userId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/BookingStatus'
+      responses:
+        '200':
+          description: Lista rezervărilor
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Bookings]
+      summary: Creează o rezervare
+      description: |
+        Rezervă unul sau mai multe intervale consecutive de 30 de minute.
+        Serverul verifică toate regulile de rezervare într-o singură tranzacție, ca să nu apară rezervări duble.
+        Un administrator poate rezerva în numele altui utilizator, trimițând `userId`.
+      operationId: createBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingCreate'
+      responses:
+        '201':
+          description: Rezervarea a fost creată
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Rezervarea încalcă o regulă
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                capacitate:
+                  value:
+                    code: CAPACITY_EXCEEDED
+                    message: Intervalul 18:30 – 19:00 nu mai are locuri libere.
+                limitaZilnica:
+                  value:
+                    code: DAILY_LIMIT_EXCEEDED
+                    message: Ai atins limita de 60 de minute pe zi la bazin.
+                restrictieOrar:
+                  value:
+                    code: STUDENT_TIME_RESTRICTED
+                    message: Studenții pot rezerva doar intervale de la 18:00.
+                mentenanta:
+                  value:
+                    code: FACILITY_IN_MAINTENANCE
+                    message: Baza este în mentenanță în intervalul ales.
+                inAfaraProgramului:
+                  value:
+                    code: OUTSIDE_OPENING_HOURS
+                    message: Intervalul ales este în afara programului bazei.
+
+  /bookings/me:
+    get:
+      tags: [Bookings]
+      summary: Rezervările utilizatorului autentificat
+      operationId: listMyBookings
+      parameters:
+        - name: scope
+          in: query
+          description: upcoming = rezervările viitoare, past = istoricul
+          schema:
+            type: string
+            enum: [upcoming, past]
+            default: upcoming
+      responses:
+        '200':
+          description: Rezervările utilizatorului
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /bookings/{bookingId}:
+    get:
+      tags: [Bookings]
+      summary: Detaliile unei rezervări
+      operationId: getBooking
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+      responses:
+        '200':
+          description: Detaliile rezervării
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /bookings/{bookingId}/cancel:
+    post:
+      tags: [Bookings]
+      summary: Anulează o rezervare
+      description: |
+        Utilizatorul își poate anula propriile rezervări care nu au început încă.
+        Administratorul poate anula orice rezervare.
+        Rezervarea nu este ștearsă: primește statusul CANCELLED și rămâne în istoric.
+      operationId: cancelBooking
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+      responses:
+        '200':
+          description: Rezervarea a fost anulată
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Rezervarea a început, s-a încheiat sau este deja anulată
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /facilities/{facilityId}/maintenance:
+    get:
+      tags: [Maintenance]
+      summary: Perioadele de mentenanță ale unei baze
+      operationId: listMaintenanceBlocks
+      parameters:
+        - $ref: '#/components/parameters/FacilityId'
+      responses:
+        '200':
+          description: Lista perioadelor de mentenanță
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MaintenanceBlock'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Maintenance]
+      summary: Blochează o bază pentru mentenanță (administrator)
+      description: Creează perioada de mentenanță și anulează automat rezervările active din acea perioadă.
+      operationId: createMaintenanceBlock
+      parameters:
+        - $ref: '#/components/parameters/FacilityId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceCreate'
+      responses:
+        '201':
+          description: Perioada de mentenanță a fost creată
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceCreated'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Perioada se suprapune cu o altă perioadă de mentenanță
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /facilities/{facilityId}/maintenance/preview:
+    get:
+      tags: [Maintenance]
+      summary: Rezervările care ar fi anulate de o mentenanță (administrator)
+      description: Folosit de ecranul de mentenanță pentru a arăta rezervările afectate înainte de confirmare.
+      operationId: previewMaintenance
+      parameters:
+        - $ref: '#/components/parameters/FacilityId'
+        - name: startsAt
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: endsAt
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: unitId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Rezervările active din perioada indicată
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /maintenance/{blockId}:
+    delete:
+      tags: [Maintenance]
+      summary: Încheie o mentenanță mai devreme (administrator)
+      description: Șterge perioada de mentenanță; intervalele redevin disponibile. Rezervările anulate nu sunt restaurate.
+      operationId: deleteMaintenanceBlock
+      parameters:
+        - name: blockId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Perioada de mentenanță a fost ștearsă
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    FacilityId:
+      name: facilityId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    BookingId:
+      name: bookingId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Lipsește token-ul de autentificare sau a expirat
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: UNAUTHORIZED
+            message: Autentifică-te pentru a continua.
+    Forbidden:
+      description: Utilizatorul nu are dreptul să facă această operație
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: FORBIDDEN
+            message: Doar administratorii pot face această operație.
+    NotFound:
+      description: Resursa nu există
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: NOT_FOUND
+            message: Resursa nu a fost găsită.
+    ValidationError:
+      description: Datele trimise nu sunt valide
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: VALIDATION_ERROR
+            message: Ora de sfârșit trebuie să fie după ora de început.
+
+  schemas:
+    Role:
+      type: string
+      enum: [STUDENT, TEACHER, ADMIN]
+
+    BookingStatus:
+      type: string
+      description: ACTIVE = activă, CANCELLED = anulată, COMPLETED = intervalul s-a încheiat
+      enum: [ACTIVE, CANCELLED, COMPLETED]
+
+    FacilityType:
+      type: string
+      enum: [POOL, GYM, FOOTBALL, BASKETBALL]
+
+    Time:
+      type: string
+      description: Oră în format HH:MM; 00:00 ca oră de închidere înseamnă miezul nopții
+      pattern: '^([01][0-9]|2[0-3]):(00|30)$'
+      example: '18:00'
+
+    GoogleLoginRequest:
+      type: object
+      required: [idToken]
+      properties:
+        idToken:
+          type: string
+          description: ID token-ul primit de frontend de la Google
+
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          description: JWT al aplicației
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      required: [id, name, email, role, blocked]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Ana Popescu
+        email:
+          type: string
+          format: email
+          example: ana.popescu@student.usv.ro
+        role:
+          $ref: '#/components/schemas/Role'
+        blocked:
+          type: boolean
+
+    UserSummary:
+      type: object
+      description: Doar numele este public; emailul nu este afișat celorlalți utilizatori
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Ana Popescu
+
+    BlockUserRequest:
+      type: object
+      required: [blocked]
+      properties:
+        blocked:
+          type: boolean
+
+    FacilityUnit:
+      type: object
+      description: O unitate rezervabilă a bazei (ex. Terenul 1 de baschet)
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Terenul 1
+
+    Facility:
+      type: object
+      required: [id, name, type, openTime, closeTime, capacityPerSlot, studentDailyLimitMinutes, units]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Bazin de înot
+        type:
+          $ref: '#/components/schemas/FacilityType'
+        openTime:
+          $ref: '#/components/schemas/Time'
+        closeTime:
+          $ref: '#/components/schemas/Time'
+        capacityPerSlot:
+          type: integer
+          minimum: 1
+          description: Persoane (sau conturi) pe interval, pentru fiecare unitate
+          example: 10
+        studentDailyLimitMinutes:
+          type: integer
+          minimum: 30
+          multipleOf: 30
+          example: 60
+        units:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacilityUnit'
+
+    FacilityInput:
+      type: object
+      required: [name, type, openTime, closeTime, capacityPerSlot, studentDailyLimitMinutes, unitNames]
+      properties:
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/FacilityType'
+        openTime:
+          $ref: '#/components/schemas/Time'
+        closeTime:
+          $ref: '#/components/schemas/Time'
+        capacityPerSlot:
+          type: integer
+          minimum: 1
+        studentDailyLimitMinutes:
+          type: integer
+          minimum: 30
+          multipleOf: 30
+        unitNames:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          example: [Terenul 1, Terenul 2]
+
+    Slot:
+      type: object
+      required: [unitId, startTime, endTime, capacity, booked, status, bookedBy]
+      properties:
+        unitId:
+          type: string
+          format: uuid
+        startTime:
+          $ref: '#/components/schemas/Time'
+        endTime:
+          $ref: '#/components/schemas/Time'
+        capacity:
+          type: integer
+          example: 10
+        booked:
+          type: integer
+          example: 4
+        status:
+          type: string
+          description: |
+            FREE = se poate rezerva; FULL = complet; MAINTENANCE = în mentenanță;
+            RESTRICTED = indisponibil pentru utilizatorul curent (ex. student înainte de 18:00);
+            PAST = intervalul a trecut
+          enum: [FREE, FULL, MAINTENANCE, RESTRICTED, PAST]
+        bookedBy:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSummary'
+
+    BookingCreate:
+      type: object
+      required: [unitId, date, startTime, endTime]
+      properties:
+        unitId:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+          example: '2026-10-16'
+        startTime:
+          $ref: '#/components/schemas/Time'
+        endTime:
+          $ref: '#/components/schemas/Time'
+        userId:
+          type: string
+          format: uuid
+          description: Doar pentru administratori, la rezervarea în numele altui utilizator
+
+    Booking:
+      type: object
+      required: [id, user, facilityId, facilityName, unitId, unitName, date, startTime, endTime, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        user:
+          $ref: '#/components/schemas/UserSummary'
+        facilityId:
+          type: string
+          format: uuid
+        facilityName:
+          type: string
+          example: Bazin de înot
+        unitId:
+          type: string
+          format: uuid
+        unitName:
+          type: string
+          example: Bazinul
+        date:
+          type: string
+          format: date
+          example: '2026-10-16'
+        startTime:
+          $ref: '#/components/schemas/Time'
+        endTime:
+          $ref: '#/components/schemas/Time'
+        status:
+          $ref: '#/components/schemas/BookingStatus'
+        cancelledBy:
+          type: string
+          nullable: true
+          description: Cine a anulat rezervarea, dacă statusul este CANCELLED
+          enum: [USER, ADMIN, MAINTENANCE]
+        createdAt:
+          type: string
+          format: date-time
+
+    MaintenanceCreate:
+      type: object
+      required: [startsAt, endsAt]
+      properties:
+        unitId:
+          type: string
+          format: uuid
+          description: Opțional; dacă lipsește, se blochează toate unitățile bazei
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          example: Curățare bazin
+
+    MaintenanceBlock:
+      type: object
+      required: [id, facilityId, startsAt, endsAt, createdBy]
+      properties:
+        id:
+          type: string
+          format: uuid
+        facilityId:
+          type: string
+          format: uuid
+        unitId:
+          type: string
+          format: uuid
+          nullable: true
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          nullable: true
+        createdBy:
+          $ref: '#/components/schemas/UserSummary'
+
+    MaintenanceCreated:
+      type: object
+      required: [block, cancelledBookings]
+      properties:
+        block:
+          $ref: '#/components/schemas/MaintenanceBlock'
+        cancelledBookings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Booking'
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: CAPACITY_EXCEEDED
+        message:
+          type: string
+          description: Mesaj afișat utilizatorului, în română
